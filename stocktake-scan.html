@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stocktake Scan</title>
+<style>
+  :root{
+    --paper:#F6F3EC; --card:#FFFFFF; --ink:#1C2422; --ink-soft:#5B655F;
+    --teal:#0F5257; --teal-deep:#0A3A3D; --green:#3A7D44; --red:#B23A48;
+    --amber:#B8742B; --line:#DAD4C4; --line-soft:#EAE5D8;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:'Iowan Old Style','Georgia',serif; -webkit-font-smoothing:antialiased; }
+  .sans{ font-family:'Helvetica Neue',Arial,sans-serif; }
+  .mono{ font-family:'SFMono-Regular','Menlo','Consolas',monospace; letter-spacing:0.01em; }
+
+  header{ background:var(--teal-deep); color:#F6F3EC; padding:22px 28px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px; border-bottom:3px solid var(--teal); }
+  header .title{ display:flex; align-items:baseline; gap:12px; }
+  header h1{ margin:0; font-size:1.7rem; font-weight:600; }
+  header .tag{ font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.78rem; color:#B9CFCE; }
+  .staff-row{ display:flex; align-items:center; gap:10px; font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.85rem; flex-wrap:wrap; }
+  .staff-row input[type=text]{ background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.25); color:#fff; padding:7px 10px; border-radius:3px; font-family:inherit; font-size:0.85rem; width:170px; }
+  .staff-row input[type=text]::placeholder{ color:#9DB6B4; }
+  .actions{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+  button{ font-family:'Helvetica Neue',Arial,sans-serif; cursor:pointer; border:none; border-radius:3px; padding:9px 16px; font-size:0.85rem; font-weight:600; transition:filter 0.15s ease; }
+  button:hover{ filter:brightness(1.08); }
+  button:active{ filter:brightness(0.95); }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+  .btn-ghost{ background:rgba(255,255,255,0.1); color:#F6F3EC; border:1px solid rgba(255,255,255,0.3); }
+  .btn-outline{ background:transparent; color:var(--teal-deep); border:1px solid var(--line); }
+
+  main{ padding:26px 28px 60px; max-width:1280px; margin:0 auto; }
+
+  .setup-banner{ background:#FBF3E3; border:1px solid var(--amber); color:#7A4E1B; padding:14px 18px; margin-bottom:22px; font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.85rem; line-height:1.6; }
+  .setup-banner input[type=text]{ width:100%; max-width:520px; padding:8px 10px; border:1px solid var(--line); border-radius:3px; font-family:inherit; font-size:0.82rem; margin-top:8px; margin-right:8px; }
+  .setup-banner .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+
+  .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:26px; }
+  .stat-card{ background:var(--card); border:1px solid var(--line-soft); border-top:3px solid var(--teal); padding:16px 18px; }
+  .stat-card.found-c{ border-top-color:var(--green); }
+  .stat-card.notfound-c{ border-top-color:var(--red); }
+  .stat-card.dup-c{ border-top-color:var(--amber); }
+  .stat-label{ font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.72rem; color:var(--ink-soft); margin-bottom:6px; }
+  .stat-num{ font-size:2rem; font-weight:600; line-height:1; }
+  .found-c .stat-num{ color:var(--green); }
+  .notfound-c .stat-num{ color:var(--red); }
+  .dup-c .stat-num{ color:var(--amber); }
+
+  .grid{ display:grid; grid-template-columns:360px 1fr; gap:22px; align-items:start; }
+  @media (max-width: 880px){ .grid{ grid-template-columns:1fr; } .stats{ grid-template-columns:repeat(2,1fr); } }
+
+  .panel{ background:var(--card); border:1px solid var(--line-soft); }
+  .panel-head{ display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--line-soft); }
+  .panel-head h2{ margin:0; font-size:1.15rem; font-weight:600; }
+  .panel-body{ padding:18px; }
+
+  .field-label{ font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.72rem; color:var(--ink-soft); margin-bottom:6px; display:block; }
+  input[type=text].scan-input{ width:100%; font-family:'Helvetica Neue',Arial,sans-serif; font-size:1.15rem; padding:16px 14px; border:2px solid var(--teal); border-radius:3px; background:#fff; color:var(--ink); }
+  .scan-input:focus{ outline:none; box-shadow:0 0 0 3px rgba(15,82,87,0.15); }
+  .scan-input:disabled{ background:var(--line-soft); }
+
+  .status-box{ margin-top:12px; padding:14px; font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.9rem; border-left:4px solid var(--line); background:var(--line-soft); color:var(--ink-soft); }
+  .status-box.ok{ border-left-color:var(--green); background:#EAF3EB; color:var(--green); }
+  .status-box.bad{ border-left-color:var(--red); background:#F7EAEB; color:var(--red); }
+  .status-box.dup{ border-left-color:var(--amber); background:#F7EEE1; color:var(--amber); }
+  .status-box.wait{ border-left-color:var(--teal); background:#EEF5F5; color:var(--teal-deep); }
+
+  .help-text{ font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.78rem; color:var(--ink-soft); margin-top:12px; line-height:1.5; }
+
+  .last-scanned{ margin-top:18px; padding-top:16px; border-top:1px solid var(--line-soft); }
+  .last-scanned .title-line{ font-weight:600; font-size:0.98rem; margin-top:4px; }
+  .last-scanned .meta{ font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.78rem; color:var(--ink-soft); margin-top:3px; }
+
+  table{ width:100%; border-collapse:collapse; }
+  th{ text-align:left; font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.72rem; color:var(--ink-soft); padding:10px 14px; border-bottom:1px solid var(--line); font-weight:600; }
+  td{ padding:11px 14px; border-bottom:1px solid var(--line-soft); font-size:0.88rem; vertical-align:top; }
+  tr:last-child td{ border-bottom:none; }
+  .badge{ display:inline-block; font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.68rem; font-weight:700; padding:2px 8px; border-radius:2px; }
+  .badge-found{ background:#EAF3EB; color:var(--green); }
+  .badge-notfound{ background:#F7EAEB; color:var(--red); }
+  .badge-dup{ background:#F7EEE1; color:var(--amber); }
+  .time-cell{ color:var(--ink-soft); font-size:0.82rem; white-space:nowrap; }
+  .empty-row{ text-align:center; color:var(--ink-soft); font-family:'Helvetica Neue',Arial,sans-serif; padding:32px; }
+  .log-scroll{ max-height:560px; overflow-y:auto; }
+
+  .toast{ position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 20px; border-radius:4px; font-family:'Helvetica Neue',Arial,sans-serif; font-size:0.85rem; opacity:0; pointer-events:none; transition:opacity 0.2s ease; z-index:50; }
+  .toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">
+    <h1>Stocktake Scan</h1>
+    <span class="tag sans">Live Koha lookup &middot; logs to Google Sheets</span>
+  </div>
+  <div class="staff-row">
+    <input type="text" id="staffName" placeholder="Your name (staff)" maxlength="40">
+    <label class="sans" style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="soundToggle"> Sound
+    </label>
+  </div>
+  <div class="actions">
+    <button class="btn-ghost" id="exportBtn">Export CSV</button>
+    <button class="btn-ghost" id="refreshBtn">Refresh log</button>
+  </div>
+</header>
+
+<main>
+
+  <div class="setup-banner" id="setupBanner">
+    <strong>One-time setup:</strong> paste the Google Apps Script Web App URL that's connected to your Google Sheet (see the setup instructions provided alongside this app). This is stored for everyone using this page.
+    <div class="row">
+      <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec">
+      <button class="btn-outline" id="saveScriptUrl">Save</button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label sans">Scans today</div>
+      <div class="stat-num" id="statToday">0</div>
+    </div>
+    <div class="stat-card found-c">
+      <div class="stat-label sans">Found today</div>
+      <div class="stat-num" id="statFound">0</div>
+    </div>
+    <div class="stat-card notfound-c">
+      <div class="stat-label sans">Not found today</div>
+      <div class="stat-num" id="statNotFound">0</div>
+    </div>
+    <div class="stat-card dup-c">
+      <div class="stat-label sans">Duplicate today</div>
+      <div class="stat-num" id="statDup">0</div>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <div class="panel">
+      <div class="panel-head"><h2>Single scan</h2></div>
+      <div class="panel-body">
+
+        <label class="field-label sans">Scan barcode / ISBN</label>
+        <input type="text" class="scan-input mono" id="scanInput" placeholder="Scan or type, then Enter" autofocus>
+
+        <div class="status-box" id="statusBox">Ready to scan.</div>
+
+        <p class="help-text">
+          Type or scan a barcode and press Enter. The app looks the barcode up on the library catalog, then saves the result to your Google Sheet: green means matched, red means no match, amber means already scanned today.
+        </p>
+
+        <div class="last-scanned">
+          <div class="field-label sans" style="margin-bottom:2px;">Last scanned item</div>
+          <div class="title-line" id="lastTitle">No item scanned yet.</div>
+          <div class="meta mono" id="lastMeta"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Recent scan log</h2>
+        <span class="sans" style="font-size:0.75rem;color:var(--ink-soft);">Reads from your Google Sheet</span>
+      </div>
+      <div class="log-scroll">
+        <table>
+          <thead>
+            <tr><th>Time</th><th>Barcode</th><th>Title</th><th>Call no.</th><th>Staff</th><th>Status</th></tr>
+          </thead>
+          <tbody id="logBody">
+            <tr><td colspan="6" class="empty-row">No scans yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const URL_KEY = 'apps_script_url_v1';
+  const STAFF_KEY = 'staff_name_v1';
+
+  let scriptUrl = '';
+  let logs = [];
+
+  const el = id => document.getElementById(id);
+  const scanInput = el('scanInput');
+  const statusBox = el('statusBox');
+  const staffName = el('staffName');
+  const soundToggle = el('soundToggle');
+  const toast = el('toast');
+  const setupBanner = el('setupBanner');
+
+  function showToast(msg){
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(()=>toast.classList.remove('show'), 2400);
+  }
+
+  function todayStr(){ return new Date().toDateString(); }
+
+  function beep(kind){
+    if(!soundToggle.checked) return;
+    try{
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const o = ctx.createOscillator(); const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = { ok:880, bad:220, dup:440 }[kind] || 440;
+      g.gain.value = 0.08; o.start();
+      setTimeout(()=>{ o.stop(); ctx.close(); }, 140);
+    }catch(e){}
+  }
+
+  async function loadConfig(){
+    try{
+      const u = await window.storage.get(URL_KEY, true);
+      if(u && u.value){ scriptUrl = u.value; el('scriptUrlInput').value = scriptUrl; setupBanner.style.display='none'; }
+    }catch(e){}
+    try{
+      const s = await window.storage.get(STAFF_KEY, false);
+      if(s) staffName.value = s.value;
+    }catch(e){}
+  }
+
+  el('saveScriptUrl').addEventListener('click', async function(){
+    const val = el('scriptUrlInput').value.trim();
+    if(!val.startsWith('https://script.google.com/')){
+      showToast('That doesn\'t look like an Apps Script Web App URL.');
+      return;
+    }
+    scriptUrl = val;
+    await window.storage.set(URL_KEY, val, true);
+    setupBanner.style.display = 'none';
+    showToast('Saved. Loading scan log...');
+    refreshLogs();
+  });
+
+  staffName.addEventListener('change', async function(){
+    await window.storage.set(STAFF_KEY, staffName.value.trim(), false);
+  });
+
+  function statusLabel(status){
+    if(status === 'found') return '<span class="badge badge-found">FOUND</span>';
+    if(status === 'notfound') return '<span class="badge badge-notfound">NOT FOUND</span>';
+    return '<span class="badge badge-dup">DUPLICATE</span>';
+  }
+
+  function escapeHtml(s){
+    return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function renderStats(){
+    const today = todayStr();
+    const todays = logs.filter(l => new Date(l.time).toDateString() === today);
+    el('statToday').textContent = todays.length;
+    el('statFound').textContent = todays.filter(l => l.status === 'found').length;
+    el('statNotFound').textContent = todays.filter(l => l.status === 'notfound').length;
+    el('statDup').textContent = todays.filter(l => l.status === 'dup').length;
+  }
+
+  function renderLog(){
+    const body = el('logBody');
+    if(logs.length === 0){
+      body.innerHTML = '<tr><td colspan="6" class="empty-row">No scans yet.</td></tr>';
+      return;
+    }
+    const rows = logs.slice().reverse().slice(0, 200).map(l => {
+      const d = new Date(l.time);
+      const timeStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      return '<tr>' +
+        '<td class="time-cell mono">'+timeStr+'</td>' +
+        '<td class="mono">'+escapeHtml(l.barcode)+'</td>' +
+        '<td>'+escapeHtml(l.title||'—')+'</td>' +
+        '<td class="mono">'+escapeHtml(l.callno||'—')+'</td>' +
+        '<td>'+escapeHtml(l.staff||'—')+'</td>' +
+        '<td>'+statusLabel(l.status)+'</td>' +
+      '</tr>';
+    }).join('');
+    body.innerHTML = rows;
+  }
+
+  async function refreshLogs(){
+    if(!scriptUrl) return;
+    try{
+      const res = await fetch(scriptUrl, { method:'GET' });
+      const data = await res.json();
+      if(data.ok){
+        logs = data.logs || [];
+        renderStats();
+        renderLog();
+      }
+    }catch(e){
+      showToast('Could not reach the Google Sheet script.');
+    }
+  }
+
+  async function handleScan(barcode){
+    barcode = barcode.trim();
+    if(!barcode) return;
+    if(!scriptUrl){
+      showToast('Paste your Apps Script URL above first.');
+      setupBanner.style.display = 'block';
+      return;
+    }
+
+    scanInput.disabled = true;
+    statusBox.className = 'status-box wait';
+    statusBox.textContent = 'Looking up ' + barcode + '...';
+
+    try{
+      const res = await fetch(scriptUrl, {
+        method:'POST',
+        headers:{ 'Content-Type':'text/plain;charset=utf-8' }, // avoids CORS preflight on Apps Script
+        body: JSON.stringify({ barcode, staff: staffName.value.trim() })
+      });
+      const data = await res.json();
+
+      if(!data.ok){
+        statusBox.className = 'status-box bad';
+        statusBox.textContent = 'Error: ' + (data.error || 'could not process scan.');
+        beep('bad');
+        scanInput.disabled = false;
+        scanInput.focus();
+        return;
+      }
+
+      if(data.status === 'dup'){
+        statusBox.className = 'status-box dup';
+        statusBox.textContent = 'Duplicate — this barcode was already scanned today.';
+        beep('dup');
+      } else if(data.status === 'found'){
+        statusBox.className = 'status-box ok';
+        statusBox.textContent = 'Found: ' + (data.title || barcode);
+        beep('ok');
+      } else {
+        statusBox.className = 'status-box bad';
+        statusBox.textContent = 'Not found on the library catalog: ' + barcode;
+        beep('bad');
+      }
+
+      el('lastTitle').textContent = data.title || barcode;
+      el('lastMeta').textContent = [data.barcode, data.callno].filter(Boolean).join(' · ');
+
+      await refreshLogs();
+    }catch(e){
+      statusBox.className = 'status-box bad';
+      statusBox.textContent = 'Could not reach the Google Sheet script. Check the URL and try again.';
+      beep('bad');
+    }
+
+    scanInput.disabled = false;
+    scanInput.focus();
+  }
+
+  scanInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){
+      const val = scanInput.value;
+      scanInput.value = '';
+      handleScan(val);
+    }
+  });
+
+  el('refreshBtn').addEventListener('click', refreshLogs);
+
+  el('exportBtn').addEventListener('click', function(){
+    if(logs.length === 0){ showToast('No scans to export yet.'); return; }
+    const header = ['Time','Barcode','Title','Call No','Staff','Status'];
+    const rows = logs.map(l => [new Date(l.time).toLocaleString(), l.barcode, l.title, l.callno, l.staff, l.status]
+      .map(v => '"' + (v||'').toString().replace(/"/g,'""') + '"').join(','));
+    const csv = [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'stocktake_scan_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click(); URL.revokeObjectURL(url);
+  });
+
+  window.addEventListener('click', () => { if(!scanInput.disabled) scanInput.focus(); });
+
+  (async function init(){
+    await loadConfig();
+    if(scriptUrl) refreshLogs();
+  })();
+})();
+</script>
+
+</body>
+</html>
