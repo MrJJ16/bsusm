@@ -1,219 +1,266 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Barcode Scanner Search System</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; background: #f4f6f8; }
-    .container { max-width: 950px; margin: 0 auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-    .step-box { background: #eef4fc; border-left: 4px solid #0056b3; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
-    input[type="text"] { width: 100%; padding: 12px; margin-top: 8px; border: 2px solid #0056b3; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
-    textarea { width: 100%; height: 100px; padding: 10px; margin-top: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: monospace; }
-    button { background: #0056b3; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-    button:hover { background: #003d80; }
-    .export-btn { background: #28a745; float: right; }
-    .export-btn:hover { background: #1e7e34; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th, td { border: 1px solid #e1e4e8; padding: 10px; text-align: left; }
-    th { background: #f1f3f5; }
-    .found { color: #28a745; font-weight: bold; }
-    .not-found { color: #dc3545; font-weight: bold; }
-    .mode-toggle { margin-bottom: 10px; font-size: 14px; }
-  </style>
+<meta charset="UTF-8">
+<title>USM Library barcode lookup</title>
+<style>
+  :root{
+    --ink:#1f2a24;
+    --ink-soft:#4b564f;
+    --paper:#f6f3ea;
+    --card:#ffffff;
+    --line:#d8d2c0;
+    --accent:#2f5d4f;
+    --accent-ink:#eaf1ed;
+    --danger:#8a3324;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family: "Iowan Old Style","Palatino Linotype",Georgia,serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding:2.5rem 1.5rem 4rem;
+  }
+  .wrap{max-width:880px;margin:0 auto;}
+  header{margin-bottom:1.75rem;border-bottom:1px solid var(--line);padding-bottom:1.25rem;}
+  header .kicker{
+    font-family:"Courier New",monospace;
+    font-size:12px;
+    letter-spacing:0.04em;
+    color:var(--ink-soft);
+    margin:0 0 6px;
+  }
+  h1{font-size:26px;font-weight:600;margin:0 0 6px;}
+  header p{font-size:14.5px;color:var(--ink-soft);margin:0;max-width:60ch;line-height:1.5;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:1.5rem;
+    margin-bottom:1.5rem;
+  }
+  .card h2{font-size:15px;margin:0 0 0.75rem;font-weight:600;}
+  textarea{
+    width:100%;
+    min-height:90px;
+    font-family:"Courier New",monospace;
+    font-size:14px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    background:#fffdf8;
+    color:var(--ink);
+    resize:vertical;
+  }
+  .row{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+  button{
+    font-family:inherit;
+    font-size:14px;
+    padding:8px 16px;
+    border-radius:3px;
+    border:1px solid var(--accent);
+    background:var(--accent);
+    color:var(--accent-ink);
+    cursor:pointer;
+  }
+  button.secondary{
+    background:transparent;
+    color:var(--accent);
+  }
+  button:hover{opacity:0.88;}
+  button:disabled{opacity:0.4;cursor:not-allowed;}
+  .hint{font-size:12.5px;color:var(--ink-soft);margin-top:6px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th,td{border-bottom:1px solid var(--line);padding:8px 8px;text-align:left;vertical-align:top;}
+  th{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:0.03em;color:var(--ink-soft);}
+  td input{
+    width:100%;
+    border:1px solid transparent;
+    background:transparent;
+    font-family:inherit;
+    font-size:13.5px;
+    padding:4px 5px;
+    border-radius:2px;
+    color:var(--ink);
+  }
+  td input:hover, td input:focus{
+    border:1px solid var(--line);
+    background:#fffdf8;
+    outline:none;
+  }
+  td.barcode{font-family:"Courier New",monospace;white-space:nowrap;}
+  td.link a{color:var(--accent);font-size:12.5px;}
+  td.remove{text-align:center;}
+  td.remove button{
+    padding:3px 8px;
+    font-size:12px;
+    border-color:var(--danger);
+    background:transparent;
+    color:var(--danger);
+  }
+  .empty{color:var(--ink-soft);font-size:13.5px;padding:1rem 0;text-align:center;}
+  footer{margin-top:2rem;font-size:12px;color:var(--ink-soft);line-height:1.6;}
+  footer a{color:var(--accent);}
+</style>
 </head>
 <body>
+<div class="wrap">
 
-<div class="container">
-  <h2>Barcode Search System</h2>
+  <header>
+    <p class="kicker">USM Library · Koha OPAC helper</p>
+    <h1>Barcode lookup builder</h1>
+    <p>Paste in barcodes to get a direct search link for each one in the USM Library catalog. Open a link, note the title and call number, fill them in below, then download everything as a spreadsheet.</p>
+  </header>
 
-  <!-- Step 1: Upload Master List -->
-  <div class="step-box">
-    <b>Step 1: Upload Master Catalog File (.csv)</b><br>
-    <input type="file" id="masterCsvInput" accept=".csv" style="margin-top:8px;">
-    <span id="masterStatus" style="margin-left: 10px; font-weight: bold; color: #555;">No list loaded</span>
+  <div class="card">
+    <h2>1. Enter barcodes</h2>
+    <textarea id="barcodeInput" placeholder="One barcode per line, e.g.&#10;123456789&#10;987654321"></textarea>
+    <div class="row">
+      <button id="addBtn">Add to list</button>
+      <span class="hint">Each barcode becomes its own row with a ready-made search link.</span>
+    </div>
   </div>
 
-  <!-- Step 2: Search Modes -->
-  <div style="margin-bottom: 20px;">
-    <div class="mode-toggle">
-      <label><input type="radio" name="searchMode" value="single" checked onclick="switchMode()"> <b>Single Barcode / Scanner Mode (Press Enter)</b></label> &nbsp;&nbsp;
-      <label><input type="radio" name="searchMode" value="bulk" onclick="switchMode()"> <b>Bulk Paste Mode</b></label>
+  <div class="card">
+    <h2>2. Look up and fill in results</h2>
+    <div id="tableWrap">
+      <p class="empty" id="emptyMsg">No barcodes added yet.</p>
+      <table id="resultsTable" style="display:none;">
+        <thead>
+          <tr>
+            <th style="width:16%;">Barcode</th>
+            <th style="width:14%;">Link</th>
+            <th style="width:32%;">Title</th>
+            <th style="width:20%;">Call number</th>
+            <th style="width:12%;">Author / notes</th>
+            <th style="width:6%;"></th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
     </div>
-
-    <!-- Single Input (Press Enter to Search) -->
-    <div id="singleModeArea">
-      <input type="text" id="singleBarcodeInput" placeholder="Scan or type barcode here and hit ENTER..." autofocus>
+    <div class="row">
+      <button id="downloadBtn" class="secondary" disabled>Download CSV</button>
+      <button id="clearBtn" class="secondary" disabled>Clear all</button>
     </div>
-
-    <!-- Bulk Input -->
-    <div id="bulkModeArea" style="display: none;">
-      <textarea id="bulkBarcodesInput" placeholder="Paste multiple barcodes here (one per line)...&#10;BC001&#10;BC002"></textarea>
-      <button onclick="performBulkSearch()">Find Details</button>
-    </div>
-
-    <button class="export-btn" onclick="exportResults()">Export Results (CSV)</button>
   </div>
 
-  <!-- Step 3: Results Display -->
-  <table id="resultsTable">
-    <thead>
-      <tr>
-        <th>Barcode</th>
-        <th>Title</th>
-        <th>Call Number</th>
-        <th>Link</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody id="resultsBody">
-      <tr><td colspan="5" style="text-align:center; color:#777;">Upload a CSV catalog above to begin scanning.</td></tr>
-    </tbody>
-  </table>
+  <footer>
+    Links open <code>opac-search.pl?q=bc:&lt;barcode&gt;</code> on elib.usm.my, Koha's standard barcode index. This tool can't read the catalog page for you automatically (the library site blocks automated access), so title and call number are filled in by hand after you open each link.
+  </footer>
 </div>
 
 <script>
-  let masterDatabase = {}; 
-  let lastSearchResults = [];
+const OPAC_BASE = "https://elib.usm.my/cgi-bin/koha/opac-search.pl?q=bc:";
+let rows = [];
+let rowId = 0;
 
-  // Parse Master CSV
-  document.getElementById('masterCsvInput').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+const barcodeInput = document.getElementById('barcodeInput');
+const addBtn = document.getElementById('addBtn');
+const tableEl = document.getElementById('resultsTable');
+const bodyEl = document.getElementById('resultsBody');
+const emptyMsg = document.getElementById('emptyMsg');
+const downloadBtn = document.getElementById('downloadBtn');
+const clearBtn = document.getElementById('clearBtn');
 
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-      const lines = evt.target.result.split('\n');
-      masterDatabase = {};
-      let count = 0;
+function render(){
+  if(rows.length === 0){
+    tableEl.style.display = 'none';
+    emptyMsg.style.display = 'block';
+    downloadBtn.disabled = true;
+    clearBtn.disabled = true;
+    bodyEl.innerHTML = '';
+    return;
+  }
+  emptyMsg.style.display = 'none';
+  tableEl.style.display = 'table';
+  downloadBtn.disabled = false;
+  clearBtn.disabled = false;
 
-      lines.forEach((line, index) => {
-        if (index === 0 || !line.trim()) return;
-        const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-        
-        if (cols.length >= 4) {
-          const [barcode, title, call_number, link] = cols;
-          masterDatabase[barcode.toUpperCase()] = { title, call_number, link };
-          count++;
-        }
-      });
+  bodyEl.innerHTML = rows.map(r => `
+    <tr data-id="${r.id}">
+      <td class="barcode">${escapeHtml(r.barcode)}</td>
+      <td class="link"><a href="${r.link}" target="_blank" rel="noopener">Open</a></td>
+      <td><input type="text" data-field="title" value="${escapeHtml(r.title)}" placeholder="Paste title here"></td>
+      <td><input type="text" data-field="callnum" value="${escapeHtml(r.callnum)}" placeholder="Call number"></td>
+      <td><input type="text" data-field="notes" value="${escapeHtml(r.notes)}" placeholder="Author etc."></td>
+      <td class="remove"><button data-remove="${r.id}">Remove</button></td>
+    </tr>
+  `).join('');
+}
 
-      document.getElementById('masterStatus').innerText = `Loaded ${count} items successfully.`;
-      document.getElementById('singleBarcodeInput').focus();
-    };
-    reader.readAsText(file);
+function escapeHtml(s){
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+addBtn.addEventListener('click', () => {
+  const lines = barcodeInput.value.split('\n').map(l => l.trim()).filter(Boolean);
+  if(lines.length === 0) return;
+  lines.forEach(bc => {
+    rows.push({
+      id: ++rowId,
+      barcode: bc,
+      link: OPAC_BASE + encodeURIComponent(bc),
+      title: '',
+      callnum: '',
+      notes: ''
+    });
   });
+  barcodeInput.value = '';
+  render();
+});
 
-  // ENTER KEY LISTENER for Single Barcode / Scanner Mode
-  document.getElementById('singleBarcodeInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const barcode = this.value.trim().toUpperCase();
-      if (barcode) {
-        searchSingleBarcode(barcode);
-        this.value = ''; // Clear input for next barcode scan
-      }
-    }
+bodyEl.addEventListener('input', (e) => {
+  const field = e.target.getAttribute('data-field');
+  if(!field) return;
+  const tr = e.target.closest('tr');
+  const id = Number(tr.getAttribute('data-id'));
+  const row = rows.find(r => r.id === id);
+  if(row) row[field] = e.target.value;
+});
+
+bodyEl.addEventListener('click', (e) => {
+  const removeId = e.target.getAttribute('data-remove');
+  if(removeId){
+    rows = rows.filter(r => r.id !== Number(removeId));
+    render();
+  }
+});
+
+clearBtn.addEventListener('click', () => {
+  if(rows.length && !confirm('Remove all rows?')) return;
+  rows = [];
+  render();
+});
+
+downloadBtn.addEventListener('click', () => {
+  const header = ['Barcode','Title','Call Number','Author/Notes','Link'];
+  const csvRows = [header];
+  rows.forEach(r => {
+    csvRows.push([r.barcode, r.title, r.callnum, r.notes, r.link]);
   });
+  const csv = csvRows.map(row =>
+    row.map(cell => {
+      const s = String(cell ?? '');
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+    }).join(',')
+  ).join('\n');
 
-  // Search Single Item and Append to Table
-  function searchSingleBarcode(barcode) {
-    if (Object.keys(masterDatabase).length === 0) {
-      alert('Please upload your Master Catalog CSV file first.');
-      return;
-    }
+  const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'usm_opac_barcode_lookup.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
 
-    const item = masterDatabase[barcode];
-    let rowData;
-
-    if (item) {
-      rowData = { barcode, title: item.title, call_number: item.call_number, link: item.link, status: 'Found' };
-    } else {
-      rowData = { barcode, title: 'N/A', call_number: 'N/A', link: '#', status: 'Not Found' };
-    }
-
-    lastSearchResults.unshift(rowData); // Add newest item to top
-    renderTable();
-  }
-
-  // Bulk Search
-  function performBulkSearch() {
-    const input = document.getElementById('bulkBarcodesInput').value;
-    const searchList = input.split('\n').map(b => b.trim().toUpperCase()).filter(b => b.length > 0);
-
-    if (Object.keys(masterDatabase).length === 0) {
-      alert('Please upload your Master Catalog CSV file first.');
-      return;
-    }
-
-    if (searchList.length === 0) {
-      alert('Please enter at least one barcode.');
-      return;
-    }
-
-    searchList.forEach(barcode => {
-      const item = masterDatabase[barcode];
-      if (item) {
-        lastSearchResults.push({ barcode, title: item.title, call_number: item.call_number, link: item.link, status: 'Found' });
-      } else {
-        lastSearchResults.push({ barcode, title: 'N/A', call_number: 'N/A', link: '#', status: 'Not Found' });
-      }
-    });
-
-    renderTable();
-  }
-
-  // Render Table
-  function renderTable() {
-    const tbody = document.getElementById('resultsBody');
-    tbody.innerHTML = '';
-
-    lastSearchResults.forEach(rowData => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><b>${rowData.barcode}</b></td>
-        <td>${rowData.title}</td>
-        <td><code>${rowData.call_number}</code></td>
-        <td>${rowData.link !== '#' ? `<a href="${rowData.link}" target="_blank">Open Link</a>` : 'N/A'}</td>
-        <td class="${rowData.status === 'Found' ? 'found' : 'not-found'}">${rowData.status}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-  }
-
-  // Switch between Single (Enter key) and Bulk Mode
-  function switchMode() {
-    const mode = document.querySelector('input[name="searchMode"]:checked').value;
-    if (mode === 'single') {
-      document.getElementById('singleModeArea').style.display = 'block';
-      document.getElementById('bulkModeArea').style.display = 'none';
-      document.getElementById('singleBarcodeInput').focus();
-    } else {
-      document.getElementById('singleModeArea').style.display = 'none';
-      document.getElementById('bulkModeArea').style.display = 'block';
-    }
-  }
-
-  // Export Results
-  function exportResults() {
-    if (lastSearchResults.length === 0) {
-      alert('No search results to export.');
-      return;
-    }
-
-    let csvContent = "data:text/csv;charset=utf-8,Barcode,Title,Call Number,Link,Status\n";
-    lastSearchResults.forEach(r => {
-      csvContent += `"${r.barcode}","${r.title}","${r.call_number}","${r.link}","${r.status}"\n`;
-    });
-
-    const encodedUri = encodeURI(csvContent);
-    const downloadAnchor = document.createElement("a");
-    downloadAnchor.setAttribute("href", encodedUri);
-    downloadAnchor.setAttribute("download", "barcode_search_results.csv");
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  }
+render();
 </script>
-
 </body>
 </html>
