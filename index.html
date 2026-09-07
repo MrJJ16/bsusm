@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Custom Barcode List Search</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; background: #f4f6f8; }
+    .container { max-width: 950px; margin: 0 auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .step-box { background: #eef4fc; border-left: 4px solid #0056b3; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
+    textarea { width: 100%; height: 110px; padding: 10px; margin-top: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: monospace; }
+    button { background: #0056b3; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+    button:hover { background: #003d80; }
+    .export-btn { background: #28a745; float: right; }
+    .export-btn:hover { background: #1e7e34; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #e1e4e8; padding: 10px; text-align: left; }
+    th { background: #f1f3f5; }
+    .found { color: #28a745; font-weight: bold; }
+    .not-found { color: #dc3545; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>Barcode Search System</h2>
+
+  <!-- Step 1: Upload Master List -->
+  <div class="step-box">
+    <b>Step 1: Upload your Master Catalog File (.csv)</b><br>
+    <input type="file" id="masterCsvInput" accept=".csv" style="margin-top:8px;">
+    <span id="masterStatus" style="margin-left: 10px; font-weight: bold; color: #555;">No list loaded</span>
+  </div>
+
+  <!-- Step 2: Search Barcodes -->
+  <div style="margin-bottom: 20px;">
+    <b>Step 2: Enter or paste barcodes to search (Single or Bulk)</b>
+    <textarea id="searchBarcodes" placeholder="Enter barcodes here (one per line)...&#10;BC001&#10;BC002"></textarea>
+    
+    <button onclick="performSearch()">Find Details</button>
+    <button class="export-btn" onclick="exportResults()">Export Results (CSV)</button>
+  </div>
+
+  <!-- Step 3: Results Display -->
+  <table id="resultsTable">
+    <thead>
+      <tr>
+        <th>Barcode</th>
+        <th>Title</th>
+        <th>Call Number</th>
+        <th>Link</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="resultsBody">
+      <tr><td colspan="5" style="text-align:center; color:#777;">Upload a CSV catalog above to begin.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  let masterDatabase = {}; // Stores { barcode: { title, call_number, link } }
+  let lastSearchResults = [];
+
+  // Parse Master CSV
+  document.getElementById('masterCsvInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const lines = evt.target.result.split('\n');
+      masterDatabase = {};
+      let count = 0;
+
+      lines.forEach((line, index) => {
+        if (index === 0 || !line.trim()) return; // Skip header/empty lines
+        const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        
+        if (cols.length >= 4) {
+          const [barcode, title, call_number, link] = cols;
+          masterDatabase[barcode.toUpperCase()] = { title, call_number, link };
+          count++;
+        }
+      });
+
+      document.getElementById('masterStatus').innerText = `Loaded ${count} items successfully.`;
+    };
+    reader.readAsText(file);
+  });
+
+  // Perform Lookup
+  function performSearch() {
+    const input = document.getElementById('searchBarcodes').value;
+    const searchList = input.split('\n').map(b => b.trim().toUpperCase()).filter(b => b.length > 0);
+    const tbody = document.getElementById('resultsBody');
+
+    if (Object.keys(masterDatabase).length === 0) {
+      alert('Please upload your Master Catalog CSV file first.');
+      return;
+    }
+
+    if (searchList.length === 0) {
+      alert('Please enter at least one barcode to search.');
+      return;
+    }
+
+    tbody.innerHTML = '';
+    lastSearchResults = [];
+
+    searchList.forEach(barcode => {
+      const item = masterDatabase[barcode];
+      let rowData;
+
+      if (item) {
+        rowData = { barcode, title: item.title, call_number: item.call_number, link: item.link, status: 'Found' };
+      } else {
+        rowData = { barcode, title: 'N/A', call_number: 'N/A', link: '#', status: 'Not Found' };
+      }
+
+      lastSearchResults.push(rowData);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><b>${rowData.barcode}</b></td>
+        <td>${rowData.title}</td>
+        <td><code>${rowData.call_number}</code></td>
+        <td>${rowData.link !== '#' ? `<a href="${rowData.link}" target="_blank">Open Link</a>` : 'N/A'}</td>
+        <td class="${rowData.status === 'Found' ? 'found' : 'not-found'}">${rowData.status}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Export Results
+  function exportResults() {
+    if (lastSearchResults.length === 0) {
+      alert('No search results available to export.');
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,Barcode,Title,Call Number,Link,Status\n";
+    lastSearchResults.forEach(r => {
+      csvContent += `"${r.barcode}","${r.title}","${r.call_number}","${r.link}","${r.status}"\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const downloadAnchor = document.createElement("a");
+    downloadAnchor.setAttribute("href", encodedUri);
+    downloadAnchor.setAttribute("download", "barcode_search_results.csv");
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  }
+</script>
+
+</body>
+</html>
