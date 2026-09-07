@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Custom Barcode List Search</title>
+  <title>Barcode Scanner Search System</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 30px; background: #f4f6f8; }
     .container { max-width: 950px; margin: 0 auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
     .step-box { background: #eef4fc; border-left: 4px solid #0056b3; padding: 15px; margin-bottom: 20px; border-radius: 4px; }
-    textarea { width: 100%; height: 110px; padding: 10px; margin-top: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: monospace; }
+    input[type="text"] { width: 100%; padding: 12px; margin-top: 8px; border: 2px solid #0056b3; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+    textarea { width: 100%; height: 100px; padding: 10px; margin-top: 8px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: monospace; }
     button { background: #0056b3; color: white; padding: 10px 18px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 10px; }
     button:hover { background: #003d80; }
     .export-btn { background: #28a745; float: right; }
@@ -17,6 +18,7 @@
     th { background: #f1f3f5; }
     .found { color: #28a745; font-weight: bold; }
     .not-found { color: #dc3545; font-weight: bold; }
+    .mode-toggle { margin-bottom: 10px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -26,17 +28,29 @@
 
   <!-- Step 1: Upload Master List -->
   <div class="step-box">
-    <b>Step 1: Upload your Master Catalog File (.csv)</b><br>
+    <b>Step 1: Upload Master Catalog File (.csv)</b><br>
     <input type="file" id="masterCsvInput" accept=".csv" style="margin-top:8px;">
     <span id="masterStatus" style="margin-left: 10px; font-weight: bold; color: #555;">No list loaded</span>
   </div>
 
-  <!-- Step 2: Search Barcodes -->
+  <!-- Step 2: Search Modes -->
   <div style="margin-bottom: 20px;">
-    <b>Step 2: Enter or paste barcodes to search (Single or Bulk)</b>
-    <textarea id="searchBarcodes" placeholder="Enter barcodes here (one per line)...&#10;BC001&#10;BC002"></textarea>
-    
-    <button onclick="performSearch()">Find Details</button>
+    <div class="mode-toggle">
+      <label><input type="radio" name="searchMode" value="single" checked onclick="switchMode()"> <b>Single Barcode / Scanner Mode (Press Enter)</b></label> &nbsp;&nbsp;
+      <label><input type="radio" name="searchMode" value="bulk" onclick="switchMode()"> <b>Bulk Paste Mode</b></label>
+    </div>
+
+    <!-- Single Input (Press Enter to Search) -->
+    <div id="singleModeArea">
+      <input type="text" id="singleBarcodeInput" placeholder="Scan or type barcode here and hit ENTER..." autofocus>
+    </div>
+
+    <!-- Bulk Input -->
+    <div id="bulkModeArea" style="display: none;">
+      <textarea id="bulkBarcodesInput" placeholder="Paste multiple barcodes here (one per line)...&#10;BC001&#10;BC002"></textarea>
+      <button onclick="performBulkSearch()">Find Details</button>
+    </div>
+
     <button class="export-btn" onclick="exportResults()">Export Results (CSV)</button>
   </div>
 
@@ -52,13 +66,13 @@
       </tr>
     </thead>
     <tbody id="resultsBody">
-      <tr><td colspan="5" style="text-align:center; color:#777;">Upload a CSV catalog above to begin.</td></tr>
+      <tr><td colspan="5" style="text-align:center; color:#777;">Upload a CSV catalog above to begin scanning.</td></tr>
     </tbody>
   </table>
 </div>
 
 <script>
-  let masterDatabase = {}; // Stores { barcode: { title, call_number, link } }
+  let masterDatabase = {}; 
   let lastSearchResults = [];
 
   // Parse Master CSV
@@ -73,7 +87,7 @@
       let count = 0;
 
       lines.forEach((line, index) => {
-        if (index === 0 || !line.trim()) return; // Skip header/empty lines
+        if (index === 0 || !line.trim()) return;
         const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
         
         if (cols.length >= 4) {
@@ -84,15 +98,47 @@
       });
 
       document.getElementById('masterStatus').innerText = `Loaded ${count} items successfully.`;
+      document.getElementById('singleBarcodeInput').focus();
     };
     reader.readAsText(file);
   });
 
-  // Perform Lookup
-  function performSearch() {
-    const input = document.getElementById('searchBarcodes').value;
+  // ENTER KEY LISTENER for Single Barcode / Scanner Mode
+  document.getElementById('singleBarcodeInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const barcode = this.value.trim().toUpperCase();
+      if (barcode) {
+        searchSingleBarcode(barcode);
+        this.value = ''; // Clear input for next barcode scan
+      }
+    }
+  });
+
+  // Search Single Item and Append to Table
+  function searchSingleBarcode(barcode) {
+    if (Object.keys(masterDatabase).length === 0) {
+      alert('Please upload your Master Catalog CSV file first.');
+      return;
+    }
+
+    const item = masterDatabase[barcode];
+    let rowData;
+
+    if (item) {
+      rowData = { barcode, title: item.title, call_number: item.call_number, link: item.link, status: 'Found' };
+    } else {
+      rowData = { barcode, title: 'N/A', call_number: 'N/A', link: '#', status: 'Not Found' };
+    }
+
+    lastSearchResults.unshift(rowData); // Add newest item to top
+    renderTable();
+  }
+
+  // Bulk Search
+  function performBulkSearch() {
+    const input = document.getElementById('bulkBarcodesInput').value;
     const searchList = input.split('\n').map(b => b.trim().toUpperCase()).filter(b => b.length > 0);
-    const tbody = document.getElementById('resultsBody');
 
     if (Object.keys(masterDatabase).length === 0) {
       alert('Please upload your Master Catalog CSV file first.');
@@ -100,25 +146,28 @@
     }
 
     if (searchList.length === 0) {
-      alert('Please enter at least one barcode to search.');
+      alert('Please enter at least one barcode.');
       return;
     }
 
-    tbody.innerHTML = '';
-    lastSearchResults = [];
-
     searchList.forEach(barcode => {
       const item = masterDatabase[barcode];
-      let rowData;
-
       if (item) {
-        rowData = { barcode, title: item.title, call_number: item.call_number, link: item.link, status: 'Found' };
+        lastSearchResults.push({ barcode, title: item.title, call_number: item.call_number, link: item.link, status: 'Found' });
       } else {
-        rowData = { barcode, title: 'N/A', call_number: 'N/A', link: '#', status: 'Not Found' };
+        lastSearchResults.push({ barcode, title: 'N/A', call_number: 'N/A', link: '#', status: 'Not Found' });
       }
+    });
 
-      lastSearchResults.push(rowData);
+    renderTable();
+  }
 
+  // Render Table
+  function renderTable() {
+    const tbody = document.getElementById('resultsBody');
+    tbody.innerHTML = '';
+
+    lastSearchResults.forEach(rowData => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><b>${rowData.barcode}</b></td>
@@ -131,10 +180,23 @@
     });
   }
 
+  // Switch between Single (Enter key) and Bulk Mode
+  function switchMode() {
+    const mode = document.querySelector('input[name="searchMode"]:checked').value;
+    if (mode === 'single') {
+      document.getElementById('singleModeArea').style.display = 'block';
+      document.getElementById('bulkModeArea').style.display = 'none';
+      document.getElementById('singleBarcodeInput').focus();
+    } else {
+      document.getElementById('singleModeArea').style.display = 'none';
+      document.getElementById('bulkModeArea').style.display = 'block';
+    }
+  }
+
   // Export Results
   function exportResults() {
     if (lastSearchResults.length === 0) {
-      alert('No search results available to export.');
+      alert('No search results to export.');
       return;
     }
 
